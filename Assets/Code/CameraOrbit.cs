@@ -32,6 +32,7 @@ namespace Mechanics
         [SerializeField, Min(0.0f)] private float _focusRadius = 1.0f;
         [SerializeField, Range(0.0f, 1.0f)] private float _focusCentering = 0.5f;
         [SerializeField, Range(0.1f, 5.0f)] private float _sensitive = 0.5f;
+        [SerializeField, Range(1.0f, 360.0f)] private float _rotationSpeed = 90.0f; 
         [SerializeField, Range(-89.0f, 89.0f)] private float _minVerticalAngle = -30.0f;
         [SerializeField, Range(-89.0f, 89.0f)] private float _maxVerticalAngle = 60.0f;
         [SerializeField] private LayerMask _obstacleMask;
@@ -74,21 +75,32 @@ namespace Mechanics
             {
                 _desiredDistance = _distance;
             }
-            _currentDistance = Mathf.Lerp(_currentDistance, _desiredDistance, Time.deltaTime * 20.0f); // Magic numbers
+            _currentDistance = Mathf.Lerp(_currentDistance, _desiredDistance, Time.deltaTime * 0.5f); // Magic numbers
+            
             Vector3 lookPosition = _focusPoint - lookDirection * _currentDistance;
 
             transform.SetPositionAndRotation(lookPosition, lookRotation);
+
+            var distanceDebug = (transform.position - _focusPoint).magnitude;
+
+            Debug.Log($"Current camera distance = {distanceDebug}");
         }
 
         public void SetFov(float fov, float changeSpeed)
         {
             _regularCamera.fieldOfView = Mathf.Lerp(_regularCamera.fieldOfView, fov, changeSpeed * Time.deltaTime);
+            Debug.Log($"Current camera FOV = {_regularCamera.fieldOfView}");
         }
 
         public void ShowPlayerLabels(PlayerLabel label)
         {
             label.DrawLabel(_regularCamera);
         }
+
+        #endregion
+
+
+        #region privateMethods
 
         private void OnValidate()
         {
@@ -102,11 +114,6 @@ namespace Mechanics
                 _minVerticalAngle = _maxVerticalAngle;
             }
         }
-
-        #endregion
-
-
-        #region privateMethods
 
         private void UpdateFocusPoint()
         {
@@ -135,17 +142,34 @@ namespace Mechanics
 
         private static float GetAngle(Vector2 direction)
         {
-
+            float angle = Mathf.Acos(direction.y) * Mathf.Deg2Rad;
+            return direction.x < 0.0f ? 360.0f - angle : angle;
         }
 
         private Quaternion ConstrainAngles(ref Vector2 orbitAngles)
         {
+            orbitAngles.x = Mathf.Clamp(orbitAngles.x, _minVerticalAngle, _maxVerticalAngle);
+            if (orbitAngles.y < 0.0f)
+            {
+                orbitAngles.y += 360.0f;
+            }
+            else if (orbitAngles.y >= 360.0f)
+            {
+                orbitAngles.y -= 360.0f;
+            }
             return Quaternion.Euler(orbitAngles);
         }
 
         private bool ManualRotation(ref Vector2 orbitAngles)
         {
-            return ;
+            Vector2 input = new Vector2(-Input.GetAxis("Mouse Y"), Input.GetAxis("Mouse X"));
+            float e = Mathf.Epsilon;
+            if (input.x < -e || input.x > e || input.y < -e || input.y > e)
+            {
+                orbitAngles += _rotationSpeed * Time.unscaledDeltaTime * input * _sensitive;
+                return true;
+            }
+            return false;
         }
 
         #endregion
